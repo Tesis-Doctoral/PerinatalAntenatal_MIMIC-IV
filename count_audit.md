@@ -2,6 +2,8 @@
 
 Run on 2026-11-18 with `sql/01_audit_counts/01_prior_information.sql` (Spanish: `01_prior_information_es.sql`), task A1. Spanish version: [`count_audit_es.md`](count_audit_es.md).
 
+**Framework stage:** S4 (count audit). Its results fix the predictors (S7) and the candidate parameters before the sample-size gate (G3).
+
 All figures are aggregate counts. No `subject_id`, `hadm_id` or patient-level row is published, and counts of 1 to 4 are shown as "<5". The proposals of this document are recorded in the outcome card ([`docs/outcome_card_antenatal.md`](docs/outcome_card_antenatal.md)) before any model is fitted.
 
 ## 1. What we needed to know
@@ -14,8 +16,8 @@ The antenatal model may use only what was known about the woman **before** the d
 
 ## 2. How it was measured
 
-- **Population:** decision D3 of the perinatal project. These are delivery hospitalizations plus admissions with a stillbirth code: 19,440 admissions of 13,735 patients.
-- **Outcome:** strict fetal death, 129 events (0.66%). The label comes from the table `fetal_death_label_v2` of the perinatal project.
+- **Population:** delivery hospitalizations, plus admissions with a stillbirth code that were not flagged as deliveries: 19,440 admissions of 13,735 patients.
+- **Outcome:** fetal death with the strict definition, that is, a code of fetal death of the whole pregnancy (ICD-10-CM O36.4, Z37.1, Z37.4, Z37.7; ICD-9-CM 656.4, V27.1, V27.4, V27.7): 129 events (0.66%). The label is in a database table with one row per admission (`fetal_death_label_v2`).
 - **Information window:** everything recorded **at least 7 days before** the admission (main buffer). Buffers of 1 and 30 days are sensitivity analyses. The buffer keeps out information from a visit at which the fetal death had already been found.
 - **Sources:**
   - earlier admissions to the same hospital (their diagnoses and procedures);
@@ -34,7 +36,7 @@ The antenatal model may use only what was known about the woman **before** the d
 |---|---|---|---|
 | 19,440 | 13,735 | 129 | 142 |
 
-**What it means.** The figures match the perinatal project. The database, the population and the label are correctly linked.
+**What it means.** The figures match the reference counts of the population and the label. The database, the population and the label are correctly linked.
 
 **For the model.** These become the expected counts: any run with another population stops (gate G1).
 
@@ -104,7 +106,7 @@ The anchor-year group is assigned to each patient by MIMIC-IV (dates are shifted
 3. **Those within 90 days** probably belong to the current pregnancy (threatened preterm labor, hypertension, bleeding). They are few but reflect complications of the ongoing pregnancy.
 
 **For the model.**
-- Two indicators: **any earlier admission** and **admission in the previous 90 days**. The second replaces "days since the last discharge" of the card, because it separates the current pregnancy from earlier ones.
+- Two indicators: **any earlier admission** and **admission in the previous 90 days**. The second is more useful than the days since the last discharge, because it separates the current pregnancy from earlier ones.
 
 ### Q-A4. Conditions in earlier admissions (7-day buffer; whole population only)
 
@@ -128,7 +130,7 @@ The percentage "with history" is computed over the 8,425 admissions with any ear
 
 **What it means.**
 1. Frequent conditions (more than 1% of the population) have enough cases for the model to learn from them.
-2. Rare ones (under 1%) contribute at most one or two events each. The model cannot learn anything stable from them, and each would use one of the 17 to 25 parameters the data support.
+2. Rare ones (under 1%) contribute at most one or two events each. The model cannot learn anything stable from them, and each would use one of the 17 to 25 parameters the data support (section 4).
 3. Earlier fetal death is the strongest risk factor in the literature, but here it is very rare (52 admissions).
 
 **For the model** (decided only from these frequencies and clinical reasons, without looking at the outcome).
@@ -219,6 +221,10 @@ The percentage "with history" is computed over the 8,425 admissions with any ear
 | Marital status | married, not married, missing | 2 |
 
 ## 4. What the audit leaves for the model
+
+### Parameters the data support
+
+With 19,440 admissions and 129 events (prevalence 0.66%), the criteria of Riley et al. support about **17 parameters** if the Cox-Snell R² of the model is 10% of its maximum, and about **25** if it is 15%. This is a prior estimate: the sample-size gate (G3) is decided with the observed R².
 
 ### Proposed predictor list (about 27 parameters)
 

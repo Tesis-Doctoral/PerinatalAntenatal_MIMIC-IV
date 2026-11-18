@@ -2,6 +2,8 @@
 
 Ejecutada el 18/11/2026 con `sql/01_audit_counts/01_prior_information_es.sql` (inglés: `01_prior_information.sql`), tarea A1. Versión en inglés: [`count_audit.md`](count_audit.md).
 
+**Etapa del framework:** E4 (auditoría de conteos). Sus resultados fijan los predictores (E7) y los parámetros candidatos antes de la puerta de tamaño de muestra (P3).
+
 Todas las cifras son conteos agregados. No se publica ningún `subject_id`, `hadm_id` ni fila a nivel de paciente, y los conteos de 1 a 4 se muestran como "<5". Las propuestas de este documento se registran en la ficha del desenlace ([`docs/outcome_card_antenatal_es.md`](docs/outcome_card_antenatal_es.md)) antes de ajustar cualquier modelo.
 
 ## 1. Qué se quería saber
@@ -14,8 +16,8 @@ El modelo prenatal solo puede usar lo que se sabía de la mujer **antes** del in
 
 ## 2. Cómo se midió
 
-- **Población:** la de la decisión D3 del proyecto perinatal. Son las hospitalizaciones de parto más las admisiones con código de mortinato: 19.440 admisiones de 13.735 pacientes.
-- **Desenlace:** muerte fetal estricta, 129 eventos (0,66%). Se usa la tabla `fetal_death_label_v2` del proyecto perinatal.
+- **Población:** hospitalizaciones de parto, más las admisiones con un código de mortinato que no quedaron marcadas como parto: 19.440 admisiones de 13.735 pacientes.
+- **Desenlace:** muerte fetal con definición estricta, es decir, un código de muerte fetal de todo el embarazo (CIE-10-CM O36.4, Z37.1, Z37.4, Z37.7; CIE-9-CM 656.4, V27.1, V27.4, V27.7): 129 eventos (0,66%). La etiqueta está en una tabla de la base con una fila por admisión (`fetal_death_label_v2`).
 - **Ventana de información:** todo lo registrado **al menos 7 días antes** del ingreso (margen principal). Como sensibilidad se usaron 1 y 30 días. El margen evita usar información de una consulta en la que ya se había detectado la muerte fetal.
 - **Fuentes:**
   - hospitalizaciones anteriores en el mismo hospital (sus diagnósticos y procedimientos);
@@ -34,7 +36,7 @@ El modelo prenatal solo puede usar lo que se sabía de la mujer **antes** del in
 |---|---|---|---|
 | 19.440 | 13.735 | 129 | 142 |
 
-**Qué significa.** Las cifras coinciden con el proyecto perinatal. La base, la población y la etiqueta están bien conectadas.
+**Qué significa.** Las cifras coinciden con los conteos de referencia de la población y de la etiqueta. La base, la población y la etiqueta están bien conectadas.
 
 **Para el modelo.** Se fija como conteo esperado: cualquier corrida con otra población se detiene (puerta P1).
 
@@ -104,7 +106,7 @@ El grupo de años es un grupo asignado a cada paciente por MIMIC-IV (las fechas 
 3. **Las de menos de 90 días** probablemente son del embarazo actual (amenaza de parto pretérmino, hipertensión, sangrado). Son pocas, pero reflejan complicaciones del embarazo en curso.
 
 **Para el modelo.**
-- Dos indicadores: **alguna hospitalización anterior** y **hospitalización en los 90 días previos**. Este último reemplaza "días desde el último egreso" de la ficha, porque distingue el embarazo actual de los anteriores.
+- Dos indicadores: **alguna hospitalización anterior** y **hospitalización en los 90 días previos**. El segundo es más útil que los días desde el último egreso, porque distingue el embarazo actual de los anteriores.
 
 ### Q-A4. Antecedentes en hospitalizaciones anteriores (margen de 7 días; solo toda la población)
 
@@ -128,7 +130,7 @@ El porcentaje "con historia" se calcula sobre las 8.425 admisiones con alguna ho
 
 **Qué significa.**
 1. Los antecedentes frecuentes (más de 1% de la población) tienen suficientes casos para que el modelo aprenda de ellos.
-2. Los raros (menos de 1%) aportan como mucho uno o dos eventos cada uno. El modelo no puede aprender algo estable de ellos, y cada uno gastaría un parámetro de los 17 a 25 que soportan los datos.
+2. Los raros (menos de 1%) aportan como mucho uno o dos eventos cada uno. El modelo no puede aprender algo estable de ellos, y cada uno gastaría uno de los 17 a 25 parámetros que soportan los datos (sección 4).
 3. La muerte fetal anterior es el factor de riesgo más fuerte en la literatura, pero aquí es muy rara (52 admisiones).
 
 **Para el modelo** (decidido solo con estas frecuencias y razones clínicas, sin mirar el desenlace).
@@ -219,6 +221,10 @@ El porcentaje "con historia" se calcula sobre las 8.425 admisiones con alguna ho
 | Estado civil | casada, no casada, faltante | 2 |
 
 ## 4. Lo que la auditoría deja para el modelo
+
+### Parámetros que soportan los datos
+
+Con 19.440 admisiones y 129 eventos (prevalencia de 0,66%), los criterios de Riley et al. soportan unos **17 parámetros** si el R² de Cox-Snell del modelo es el 10% de su máximo, y unos **25** si es el 15%. Es una estimación previa: la puerta de tamaño de muestra (P3) se decide con el R² observado.
 
 ### Lista de predictores propuesta (unos 27 parámetros)
 

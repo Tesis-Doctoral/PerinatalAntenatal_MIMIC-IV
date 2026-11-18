@@ -1,6 +1,6 @@
 # Outcome card — antenatal prediction of fetal death, MIMIC-IV
 
-Version 1, 2026-11-18. Third application of the staged framework ([`../framework.md`](../framework.md), version 1.0). It is return **R3** (another prediction point) of the outcome *perinatal death before birth*, whose first model (`PerinatalMortality_MIMIC-IV`, prediction at admission + 6 h) found that 73 of 129 fetal deaths were already present at the prediction point (count audit group G, task T45). Fields marked **pending** are fixed, and recorded in the decision log, before the gate that needs them. Spanish version: [`outcome_card_antenatal_es.md`](outcome_card_antenatal_es.md).
+Version 2, 2026-11-18 (version 1 of the same day, updated with the count audit A1: [`../count_audit.md`](../count_audit.md)). Third application of the staged framework ([`../framework.md`](../framework.md), version 1.0). It is return **R3** (another prediction point) of the outcome *perinatal death before birth*, whose first model (`PerinatalMortality_MIMIC-IV`, prediction at admission + 6 h) found that 73 of 129 fetal deaths were already present at the prediction point (count audit group G, task T45). Fields marked **pending** are fixed, and recorded in the decision log, before the gate that needs them. Spanish version: [`outcome_card_antenatal_es.md`](outcome_card_antenatal_es.md).
 
 ## 1. The question
 
@@ -24,31 +24,46 @@ At admission, the fetal death has often already happened: a model at admission +
 |---|---|
 | Time zero and prediction point | Admission time of the delivery hospitalization |
 | Information window | Everything recorded **at least 7 days before** the admission: earlier MIMIC-IV admissions discharged by then, outpatient measurements (OMR) and outpatient laboratory values dated by then |
-| Why 7 days | A fetal death diagnosed at an outpatient visit is usually followed by an admission within days. A buffer keeps information recorded after the death out of the model. Sensitivity: 1 and 30 days |
+| Why 7 days | A fetal death diagnosed at an outpatient visit is usually followed by an admission within days. A buffer keeps information recorded after the death out of the model. Sensitivity: 1 and 30 days (the audit lost only 3 events with information between them) |
+| Current-pregnancy window | Measurements and laboratory values of the current pregnancy are taken **between 280 and 7 days before** the admission (about one pregnancy). Earlier values are not used; with no value in this window the predictor is missing, with its indicator |
 | Also allowed | Patient attributes of the current admission that do not depend on how she arrived: age, race and ethnicity, insurance, language, marital status |
 | Excluded | Anything of the current admission: diagnoses, procedures, laboratory values, admission type and admission location (they reflect how she presented, which the event itself can cause), emergency department data |
 
-## 4. Candidate predictors (S7)
+## 4. Predictors (S7), fixed with the count audit
 
-Chosen by clinical rationale before any model; the final list depends on coverage (counts of section 8, coverage rule of 10% of the population). Each block has an indicator of whether any information exists: **absence of a record is not absence of the condition**, because many women have no earlier encounter in this hospital.
+Fixed on 2026-11-18 from the frequencies of the count audit (whole population, never split by outcome) and clinical reasons. **Absence of a record is not absence of the condition**: many women have no earlier encounter in this hospital, so the blocks carry indicators.
 
-| Block | Variables |
-|---|---|
-| Registration | Age; race and ethnicity (5 groups); insurance; language; marital status |
-| Encounter history | Any earlier admission; number of earlier admissions; any earlier obstetric admission; days since the last discharge |
-| Obstetric history (earlier admissions) | Earlier fetal death or stillbirth; earlier preterm delivery; earlier cesarean; earlier preeclampsia, eclampsia or gestational hypertension; gestational diabetes in an earlier pregnancy |
-| Chronic conditions (earlier admissions) | Chronic hypertension; pregestational diabetes; obesity; chronic kidney disease; thyroid disease; systemic lupus or antiphospholipid syndrome; thrombophilia; tobacco, alcohol or drug use; HIV or syphilis |
-| Outpatient measurements (OMR) | Last body mass index, weight, systolic and diastolic blood pressure in the window |
-| Outpatient laboratory values | Last hemoglobin A1c, hemoglobin and creatinine in the window |
+| Block | Predictors | Parameters | Source in the audit |
+|---|---|---|---|
+| Registration | Age (continuous); race and ethnicity (White, Black, Hispanic, Asian, other or unknown); insurance (Medicaid, private, Medicare or other or missing); language (English, other or missing); marital status (married, not married, missing) | 10 | Q-A7 |
+| Encounter history | Any earlier admission; admission in the previous 90 days (current pregnancy) | 2 | Q-A1, Q-A3 |
+| History (earlier admissions) | Earlier cesarean; hypertensive disorder in an earlier pregnancy; chronic hypertension; pregestational diabetes; gestational diabetes in an earlier pregnancy; tobacco, alcohol or drug use; thyroid disease; **adverse outcome in an earlier pregnancy** (fetal death or preterm delivery); **other high-risk chronic condition** (lupus, antiphospholipid syndrome or thrombophilia; HIV or syphilis; chronic kidney disease) | 9 | Q-A4 |
+| Current-pregnancy visits (omr) | Last systolic and last diastolic blood pressure; any pressure of 140/90 or more; last body mass index (if missing, computed from the last weight and any height) | 4 | Q-A5 |
+| Current-pregnancy laboratory | Last hemoglobin | 1 | Q-A6 |
+| Indicator | Had prenatal care in this hospital (any outpatient measurement or laboratory value in the current-pregnancy window) | 1 | Q-A1, Q-A5, Q-A6 |
+| **Total** | | **27** | |
+
+**Dropped, with the reason:** number of earlier admissions and days since the last discharge (replaced by the 90-day indicator); obesity by code (the measured body mass index is more precise and has far more coverage); creatinine (old values, little information; kidney disease is in the composite); hemoglobin A1c (ordered selectively; diabetes is covered by the history); rare conditions as single predictors (merged into the two composites).
+
+**Plausibility limits:** systolic 60–250 mmHg, diastolic 30–150 mmHg, body mass index 12–80 kg/m², weight 70–600 lb, height 48–84 in, hemoglobin 3–20 g/dL. Values outside are set to missing.
 
 ## 5. Sample size and learner (G3, S8)
 
 | Field | Value |
 |---|---|
-| Candidate parameters | **Pending** (count every category and indicator) |
+| Candidate parameters | 27 |
 | Supported parameters | About 17 to 25, from the perinatal pre-estimate (same events and prevalence); the gate uses the observed Cox-Snell R² |
 | Primary learner | Penalized logistic regression (events per parameter below 20); tree models and the ensemble as comparisons |
-| Reduced predictor set | Fixed before G3: registration, encounter-history indicator, the three obstetric-history variables with most coverage, chronic hypertension, pregestational diabetes, last blood pressure and body mass index with their indicators. Never chosen by association with the outcome |
+| Reduced predictor set (17 parameters) | Age; race and ethnicity (4); Medicaid; English; married; had prenatal care in this hospital; last systolic; elevated pressure; body mass index; hemoglobin; hypertensive history (chronic or in an earlier pregnancy); diabetes (pregestational or gestational in an earlier pregnancy); adverse outcome in an earlier pregnancy. Fixed on 2026-11-18, before any model; never chosen by association with the outcome |
+
+## 5b. Sensitivity analyses
+
+| Analysis | Question |
+|---|---|
+| Buffers of 1 and 30 days | Does the result depend on the buffer? |
+| Only patients with any earlier information (99 events) | Does the result depend on who has a history in this hospital? |
+| Calibration by period | Does the model work the same in periods with less history (C4; the audit found less information in recent periods) |
+| Strict plus partial; 22 and 28 weeks or more; without early-loss codes | Do the label definitions change the result? (perinatal D5) |
 
 ## 6. Classification criteria (G4)
 
@@ -67,9 +82,9 @@ Chosen by clinical rationale before any model; the final list depends on coverag
 
 ## 8. Next tasks
 
-1. Count audit A1: how many admissions of the population have any information in the window (earlier admission, OMR, outpatient laboratory value), in events and non-events, by era and buffer.
-2. Coverage of each candidate predictor; fix the final list and the candidate parameters.
-3. Predictor table; sample-size check (G3).
+1. ~~Count audit A1~~ (done 2026-11-18, [`../count_audit.md`](../count_audit.md)).
+2. Predictor table: `sql/02_predictors/01_predictor_table.sql` (task A2), one row per admission and buffer.
+3. Sample-size check with the observed Cox-Snell R² (G3); reduced set if needed.
 4. Nested grouped validation, criteria C1, C2 and C4, classification.
 
 *Confidential: internal use of the research project.*

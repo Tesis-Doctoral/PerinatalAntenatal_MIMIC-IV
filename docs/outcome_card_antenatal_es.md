@@ -1,6 +1,6 @@
 # Ficha del desenlace — predicción prenatal de la muerte fetal, MIMIC-IV
 
-Versión 1, 18/11/2026. Tercera aplicación del framework por etapas ([`../framework_es.md`](../framework_es.md), versión 1.0). Es el retorno **R3** (otro punto de predicción) del desenlace *muerte perinatal antes del nacimiento*, cuyo primer modelo (`PerinatalMortality_MIMIC-IV`, predicción a las 6 h del ingreso) encontró que 73 de 129 muertes fetales ya estaban presentes en el punto de predicción (auditoría de conteos, grupo G, tarea T45). Los campos marcados **pendiente** se fijan, y se registran en el libro de decisiones, antes de la puerta que los necesita. Versión en inglés: [`outcome_card_antenatal.md`](outcome_card_antenatal.md).
+Versión 2, 18/11/2026 (versión 1 del mismo día, actualizada con la auditoría de conteos A1: [`../count_audit_es.md`](../count_audit_es.md)). Tercera aplicación del framework por etapas ([`../framework_es.md`](../framework_es.md), versión 1.0). Es el retorno **R3** (otro punto de predicción) del desenlace *muerte perinatal antes del nacimiento*, cuyo primer modelo (`PerinatalMortality_MIMIC-IV`, predicción a las 6 h del ingreso) encontró que 73 de 129 muertes fetales ya estaban presentes en el punto de predicción (auditoría de conteos, grupo G, tarea T45). Los campos marcados **pendiente** se fijan, y se registran en el libro de decisiones, antes de la puerta que los necesita. Versión en inglés: [`outcome_card_antenatal.md`](outcome_card_antenatal.md).
 
 ## 1. La pregunta
 
@@ -24,31 +24,46 @@ Al ingreso, la muerte fetal muchas veces ya ocurrió: un modelo a las 6 h del in
 |---|---|
 | Tiempo cero y punto de predicción | Hora de ingreso de la hospitalización de parto |
 | Ventana de información | Todo lo registrado **al menos 7 días antes** del ingreso: admisiones anteriores de MIMIC-IV con egreso hasta entonces, mediciones ambulatorias (OMR) y laboratorios ambulatorios fechados hasta entonces |
-| Por qué 7 días | Una muerte fetal diagnosticada en una consulta ambulatoria suele seguirse de un ingreso en pocos días. El margen deja fuera del modelo la información registrada después de la muerte. Sensibilidad: 1 y 30 días |
+| Por qué 7 días | Una muerte fetal diagnosticada en una consulta ambulatoria suele seguirse de un ingreso en pocos días. El margen deja fuera del modelo la información registrada después de la muerte. Sensibilidad: 1 y 30 días (la auditoría solo perdió 3 eventos con información entre ellos) |
+| Ventana del embarazo actual | Las mediciones y los laboratorios del embarazo actual se toman **entre 280 y 7 días antes** del ingreso (aproximadamente un embarazo). No se usan valores anteriores; si no hay valor en esta ventana, el predictor queda faltante, con su indicador |
 | También permitido | Atributos de la paciente en el ingreso actual que no dependen de cómo llegó: edad, raza y etnia, seguro, idioma, estado civil |
 | Excluido | Todo lo del ingreso actual: diagnósticos, procedimientos, laboratorios, tipo y lugar de admisión (reflejan cómo se presentó, algo que el propio evento puede causar), datos de urgencias |
 
-## 4. Predictores candidatos (E7)
+## 4. Predictores (E7), fijados con la auditoría de conteos
 
-Elegidos por razón clínica antes de cualquier modelo; la lista final depende de la cobertura (conteos de la sección 8, regla de cobertura del 10% de la población). Cada bloque tiene un indicador de si existe información: **que no haya registro no significa que no exista la condición**, porque muchas mujeres no tienen atenciones anteriores en este hospital.
+Fijados el 18/11/2026 con las frecuencias de la auditoría de conteos (toda la población, nunca separada por desenlace) y razones clínicas. **Que no haya registro no significa que no exista la condición**: muchas mujeres no tienen atenciones anteriores en este hospital, por eso los bloques llevan indicadores.
 
-| Bloque | Variables |
-|---|---|
-| Registro | Edad; raza y etnia (5 grupos); seguro; idioma; estado civil |
-| Historia de atenciones | Alguna admisión anterior; número de admisiones anteriores; alguna admisión obstétrica anterior; días desde el último egreso |
-| Antecedentes obstétricos (admisiones anteriores) | Muerte fetal o mortinato anterior; parto pretérmino anterior; cesárea anterior; preeclampsia, eclampsia o hipertensión gestacional anterior; diabetes gestacional en un embarazo anterior |
-| Condiciones crónicas (admisiones anteriores) | Hipertensión crónica; diabetes pregestacional; obesidad; enfermedad renal crónica; enfermedad tiroidea; lupus o síndrome antifosfolípido; trombofilia; consumo de tabaco, alcohol o drogas; VIH o sífilis |
-| Mediciones ambulatorias (OMR) | Último índice de masa corporal, peso, presión sistólica y diastólica en la ventana |
-| Laboratorios ambulatorios | Última hemoglobina glicosilada, hemoglobina y creatinina en la ventana |
+| Bloque | Predictores | Parámetros | Fuente en la auditoría |
+|---|---|---|---|
+| Registro | Edad (continua); raza y etnia (blanca, negra, hispana, asiática, otra o desconocida); seguro (Medicaid, privado, Medicare u otro o faltante); idioma (inglés, otro o faltante); estado civil (casada, no casada, faltante) | 10 | Q-A7 |
+| Historia de atenciones | Alguna admisión anterior; admisión en los 90 días previos (embarazo actual) | 2 | Q-A1, Q-A3 |
+| Antecedentes (admisiones anteriores) | Cesárea anterior; trastorno hipertensivo en embarazo anterior; hipertensión crónica; diabetes pregestacional; diabetes gestacional en embarazo anterior; consumo de tabaco, alcohol o drogas; enfermedad tiroidea; **resultado adverso en embarazo anterior** (muerte fetal o parto pretérmino); **otra condición crónica de alto riesgo** (lupus, antifosfolípido o trombofilia; VIH o sífilis; enfermedad renal crónica) | 9 | Q-A4 |
+| Controles del embarazo actual (omr) | Última presión sistólica y última diastólica; alguna presión de 140/90 o más; último índice de masa corporal (si falta, calculado con el último peso y cualquier talla) | 4 | Q-A5 |
+| Laboratorio del embarazo actual | Última hemoglobina | 1 | Q-A6 |
+| Indicador | Tuvo control prenatal en este hospital (alguna medición o laboratorio ambulatorio en la ventana del embarazo actual) | 1 | Q-A1, Q-A5, Q-A6 |
+| **Total** | | **27** | |
+
+**Descartados, con su razón:** número de admisiones anteriores y días desde el último egreso (reemplazados por el indicador de 90 días); obesidad por código (el índice de masa corporal medido es más preciso y tiene mucha más cobertura); creatinina (valores antiguos, poca información; la enfermedad renal está en el compuesto); hemoglobina glicosilada (se pide de forma selectiva; la diabetes está cubierta por los antecedentes); condiciones raras como predictores sueltos (unidas en los dos compuestos).
+
+**Límites de plausibilidad:** sistólica 60–250 mmHg, diastólica 30–150 mmHg, índice de masa corporal 12–80 kg/m², peso 70–600 lb, talla 48–84 pulgadas, hemoglobina 3–20 g/dL. Los valores por fuera quedan faltantes.
 
 ## 5. Tamaño de muestra y modelo (P3, E8)
 
 | Campo | Valor |
 |---|---|
-| Parámetros candidatos | **Pendiente** (contar cada categoría e indicador) |
+| Parámetros candidatos | 27 |
 | Parámetros soportados | Entre 17 y 25, según la estimación previa del perinatal (mismos eventos y prevalencia); la puerta usa el R² de Cox-Snell observado |
 | Modelo principal | Regresión logística penalizada (menos de 20 eventos por parámetro); modelos de árboles y ensamble como comparaciones |
-| Conjunto reducido | Se fija antes de P3: registro, indicador de historia de atenciones, las tres variables de antecedentes obstétricos con más cobertura, hipertensión crónica, diabetes pregestacional, última presión arterial e índice de masa corporal con sus indicadores. Nunca se elige por asociación con el desenlace |
+| Conjunto reducido (17 parámetros) | Edad; raza y etnia (4); Medicaid; inglés; casada; tuvo control prenatal en este hospital; última sistólica; presión elevada; índice de masa corporal; hemoglobina; antecedente hipertensivo (crónico o en embarazo anterior); diabetes (pregestacional o gestacional en embarazo anterior); resultado adverso en embarazo anterior. Fijado el 18/11/2026, antes de cualquier modelo; nunca elegido por asociación con el desenlace |
+
+## 5b. Análisis de sensibilidad
+
+| Análisis | Pregunta |
+|---|---|
+| Márgenes de 1 y 30 días | ¿El resultado depende del margen? |
+| Solo pacientes con alguna información previa (99 eventos) | ¿El resultado depende de quién tiene historia en este hospital? |
+| Calibración por período | ¿El modelo funciona igual en períodos con menos historia (C4; la auditoría encontró menos información en los períodos recientes)? |
+| Estricta más parcial; 22 y 28 semanas o más; sin códigos de pérdida temprana | ¿Las definiciones de la etiqueta cambian el resultado? (D5 perinatal) |
 
 ## 6. Criterios de clasificación (P4)
 
@@ -67,9 +82,9 @@ Elegidos por razón clínica antes de cualquier modelo; la lista final depende d
 
 ## 8. Próximas tareas
 
-1. Auditoría de conteos A1: cuántas admisiones de la población tienen información en la ventana (admisión anterior, OMR, laboratorio ambulatorio), en eventos y no eventos, por era y por margen.
-2. Cobertura de cada predictor candidato; fijar la lista final y los parámetros candidatos.
-3. Tabla de predictores; verificación del tamaño de muestra (P3).
+1. ~~Auditoría de conteos A1~~ (hecha el 18/11/2026, [`../count_audit_es.md`](../count_audit_es.md)).
+2. Tabla de predictores: `sql/02_predictors/01_predictor_table_es.sql` (tarea A2), una fila por admisión y margen.
+3. Verificación del tamaño de muestra con el R² de Cox-Snell observado (P3); conjunto reducido si hace falta.
 4. Validación anidada agrupada, criterios C1, C2 y C4, clasificación.
 
 *Confidencial: uso interno del proyecto de investigación.*
