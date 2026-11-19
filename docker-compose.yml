@@ -1,6 +1,5 @@
-# Optional: use it ONLY if you do not already have the MIMIC-IV PostgreSQL container of the
-# companion project (MaternalMortality_MIMIC-IV) running. Both projects use the same database;
-# never run two PostgreSQL containers on the same MIMICIV_DATA_DIR.
+# Optional: use it ONLY if you do not already have a MIMIC-IV PostgreSQL database running.
+# Never run two PostgreSQL containers on the same MIMICIV_DATA_DIR.
 version: '3.9'
 services:
   db_mimiciv:
@@ -18,7 +17,7 @@ services:
 
   jupyter:
     image: jupyter/base-notebook:python-3.10
-    container_name: jupyter_python_perinatal
+    container_name: jupyter_python_antenatal
     ports:
       - "8890:8888"
     volumes:

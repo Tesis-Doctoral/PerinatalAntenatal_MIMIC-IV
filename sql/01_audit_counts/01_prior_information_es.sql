@@ -13,7 +13,7 @@
 --   ambulatorios (labevents sin hadm_id) registrados hasta t0 - B.
 -- Márgenes: 7 días (principal), 1 y 30 días (sensibilidad).
 --
--- Regla contra la selección por desenlace (como la decisión D10 del plan perinatal): la disponibilidad de un
+-- Regla contra la selección por desenlace: la disponibilidad de un
 -- BLOQUE completo de información se muestra en eventos y no eventos (Q-A1 a Q-A3), porque
 -- decide si el modelo es factible. La frecuencia de cada condición individual (Q-A4 a Q-A7) se
 -- muestra solo para toda la población, nunca separada por desenlace, para que ningún predictor se elija
@@ -23,8 +23,8 @@
 -- NO publicar filas con subject_id o hadm_id, y mostrar los conteos menores de 5 como "<5" en todo
 -- archivo publicado.
 --
--- Requisitos: mimiciv.fetal_death_label_v2 (PerinatalMortality_MIMIC-IV, tarea T16),
--- mimiciv.cohort_obstetric_v2 (MaternalMortality_MIMIC-IV_Cureus), y las tablas hosp de MIMIC-IV
+-- Requisitos: tablas derivadas mimiciv.antenatal_fetal_death_label (etiqueta por admisión) y
+-- mimiciv.antenatal_obstetric_universe (universo obstétrico), construidas por sql/00_cohort_and_label/, y las tablas hosp de MIMIC-IV
 -- admissions, patients, diagnoses_icd, procedures_icd, omr, labevents, d_labitems.
 -- Las tablas de laboratorio ambulatorio (paso 0.5) leen labevents para las pacientes de la
 -- población; puede tardar varios minutos.
@@ -36,7 +36,7 @@
 SET search_path TO mimiciv, public;
 
 -- ----------------------------------------------------------------------------
--- 0.1 Población (decisión D3 del proyecto perinatal) y márgenes
+-- 0.1 Población (hospitalizaciones de parto más admisiones con código de mortinato) y márgenes
 -- ----------------------------------------------------------------------------
 DROP TABLE IF EXISTS tmp_ai_base;
 CREATE TEMP TABLE tmp_ai_base AS
@@ -45,8 +45,8 @@ SELECT l.subject_id, l.hadm_id, l.admittime AS t0, l.icd_era, l.anchor_year_grou
        CASE WHEN l.fd_strict THEN '1 strict event'
             WHEN l.fd_any    THEN '2 partial-only event'
             ELSE                  '3 non-event' END AS ev_group
-FROM   mimiciv.fetal_death_label_v2 l
-WHERE  l.in_pop_d3;
+FROM   mimiciv.antenatal_fetal_death_label l
+WHERE  l.in_population;
 CREATE INDEX ON tmp_ai_base (subject_id);
 
 DROP TABLE IF EXISTS tmp_ai_buffer;
@@ -66,7 +66,7 @@ JOIN   mimiciv.admissions a2
        ON  a2.subject_id = b.subject_id
        AND a2.hadm_id   <> b.hadm_id
        AND a2.dischtime <= b.t0 - make_interval(days => bf.buffer_days)
-LEFT JOIN mimiciv.cohort_obstetric_v2 c2 ON c2.hadm_id = a2.hadm_id;
+LEFT JOIN mimiciv.antenatal_obstetric_universe c2 ON c2.hadm_id = a2.hadm_id;
 
 -- ----------------------------------------------------------------------------
 -- 0.3 Condiciones registradas en admisiones anteriores (margen principal de 7 días)
@@ -113,7 +113,7 @@ SELECT p.hadm_id,
                          AND ((pr.icd_version = 10 AND pr.icd_code IN ('10D00Z0','10D00Z1','10D00Z2'))
                            OR (pr.icd_version = 9  AND pr.icd_code ~ '^(740|741|742|744|7499)')))) AS hx_cesarean
 FROM   tmp_ai_prior_adm p
-LEFT JOIN mimiciv.fetal_death_label_v2 l2 ON l2.hadm_id = p.prior_hadm_id
+LEFT JOIN mimiciv.antenatal_fetal_death_label l2 ON l2.hadm_id = p.prior_hadm_id
 WHERE  p.buffer_days = 7
 GROUP  BY p.hadm_id;
 

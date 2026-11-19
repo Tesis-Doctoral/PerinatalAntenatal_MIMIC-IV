@@ -1,22 +1,22 @@
 # Ficha del desenlace — predicción prenatal de la muerte fetal, MIMIC-IV
 
-Versión 2, 18/11/2026 (versión 1 del mismo día, actualizada con la auditoría de conteos A1: [`../count_audit_es.md`](../count_audit_es.md)). Tercera aplicación del framework por etapas ([`../framework_es.md`](../framework_es.md), versión 1.0). Es el retorno **R3** (otro punto de predicción) del desenlace *muerte perinatal antes del nacimiento*, cuyo primer modelo (`PerinatalMortality_MIMIC-IV`, predicción a las 6 h del ingreso) encontró que 73 de 129 muertes fetales ya estaban presentes en el punto de predicción (auditoría de conteos, grupo G, tarea T45). Los campos marcados **pendiente** se fijan, y se registran en el libro de decisiones, antes de la puerta que los necesita. Versión en inglés: [`outcome_card_antenatal.md`](outcome_card_antenatal.md).
+Ficha del desenlace del modelo prenatal, según el framework por etapas ([`../framework_es.md`](../framework_es.md)). Los campos marcados **pendiente** se fijan, y se registran en el libro de decisiones, antes de la puerta que los necesita. Versión en inglés: [`outcome_card_antenatal.md`](outcome_card_antenatal.md).
 
 ## 1. La pregunta
 
-Al ingreso, la muerte fetal muchas veces ya ocurrió: un modelo a las 6 h del ingreso la reconoce (identificador temprano). Este modelo hace otra pregunta: **con lo que se sabía de la mujer antes de este ingreso, ¿se podía ver un riesgo alto de muerte fetal?** Solo entra información registrada antes del ingreso, así que el evento ocurre después de la información que lo predice.
+Cuando la mujer llega al hospital, la muerte fetal muchas veces ya ocurrió: un modelo que usara información del ingreso la reconocería, pero no la predeciría. Por eso este modelo hace la pregunta antes del ingreso: **con lo que se sabía de la mujer antes de este ingreso, ¿se podía ver un riesgo alto de muerte fetal?** Solo entra información registrada antes del ingreso, así que el evento ocurre después de la información que lo predice.
 
 ## 2. Identidad
 
-| Campo | Valor | Fuente |
-|---|---|---|
-| Desenlace | Muerte perinatal antes del nacimiento (muerte fetal o mortinato), siempre rotulada como proxy | D2 perinatal |
-| Peldaño | Mismo desenlace; nuevo punto de predicción (retorno R3) | — |
-| Fuente de datos | MIMIC-IV v3.1; tablas de los proyectos materno y perinatal (sección 7) | — |
-| Unidad y grupo | Hospitalización de parto; paciente como unidad de agrupación | D4 perinatal |
-| Población | Población de la D3 perinatal: bandera de parto (v2) o código de mortinato, 19.440 admisiones | D3 perinatal |
-| Etiqueta principal | Código estricto a cualquier edad gestacional (`fetal_death_label_v2.label_main`): 129 eventos (0,66%) | D5 perinatal, T16 |
-| Etiquetas de sensibilidad | Estricta más parcial; 22 y 28 semanas o más (solo CIE-10); sin códigos de pérdida temprana | D5 perinatal |
+| Campo | Valor |
+|---|---|
+| Desenlace | Muerte perinatal antes del nacimiento (muerte fetal o mortinato), identificada con los códigos CIE de la madre y siempre rotulada como proxy |
+| Peldaño | Desenlace ideal (primer peldaño de la escalera de desenlaces) |
+| Fuente de datos | MIMIC-IV v3.1 (sección 7) |
+| Unidad y grupo | Hospitalización de parto; paciente como unidad de agrupación (las particiones nunca separan a una paciente) |
+| Población | Hospitalizaciones de parto, más las admisiones con un código de mortinato que no quedaron marcadas como parto: 19.440 admisiones de 13.735 pacientes |
+| Etiqueta principal | Código estricto de muerte fetal a cualquier edad gestacional (CIE-10-CM O36.4, Z37.1, Z37.4, Z37.7; CIE-9-CM 656.4, V27.1, V27.4, V27.7): 129 eventos (0,66%) |
+| Etiquetas de sensibilidad | Estricta más parcial (embarazos múltiples con muerte de algún feto); 22 y 28 semanas o más (solo CIE-10, donde hay semanas de gestación); sin códigos de pérdida temprana |
 
 ## 3. Punto de predicción y ventana de información (E6)
 
@@ -52,9 +52,9 @@ Fijados el 18/11/2026 con las frecuencias de la auditoría de conteos (toda la p
 | Campo | Valor |
 |---|---|
 | Parámetros candidatos | 27 |
-| Parámetros soportados | Entre 17 y 25, según la estimación previa del perinatal (mismos eventos y prevalencia); la puerta usa el R² de Cox-Snell observado |
+| Parámetros soportados | Entre 17 y 25 según los criterios de Riley et al. con 19.440 admisiones y 129 eventos, si el R² de Cox-Snell es el 10% o el 15% de su máximo; la puerta usa el R² observado |
 | Modelo principal | Regresión logística penalizada (menos de 20 eventos por parámetro); modelos de árboles y ensamble como comparaciones |
-| Conjunto reducido (17 parámetros) | Edad; raza y etnia (4); Medicaid; inglés; casada; tuvo control prenatal en este hospital; última sistólica; presión elevada; índice de masa corporal; hemoglobina; antecedente hipertensivo (crónico o en embarazo anterior); diabetes (pregestacional o gestacional en embarazo anterior); resultado adverso en embarazo anterior. Fijado el 18/11/2026, antes de cualquier modelo; nunca elegido por asociación con el desenlace |
+| Conjunto reducido (17 parámetros) | Edad; raza y etnia (4); Medicaid; inglés; casada; tuvo control prenatal en este hospital; última sistólica; presión elevada; índice de masa corporal; hemoglobina; antecedente hipertensivo (crónico o en embarazo anterior); diabetes (pregestacional o gestacional en embarazo anterior); resultado adverso en embarazo anterior. Fijado antes de cualquier modelo; nunca elegido por asociación con el desenlace |
 
 ## 5b. Análisis de sensibilidad
 
@@ -63,7 +63,7 @@ Fijados el 18/11/2026 con las frecuencias de la auditoría de conteos (toda la p
 | Márgenes de 1 y 30 días | ¿El resultado depende del margen? |
 | Solo pacientes con alguna información previa (99 eventos) | ¿El resultado depende de quién tiene historia en este hospital? |
 | Calibración por período | ¿El modelo funciona igual en períodos con menos historia (C4; la auditoría encontró menos información en los períodos recientes)? |
-| Estricta más parcial; 22 y 28 semanas o más; sin códigos de pérdida temprana | ¿Las definiciones de la etiqueta cambian el resultado? (D5 perinatal) |
+| Estricta más parcial; 22 y 28 semanas o más; sin códigos de pérdida temprana | ¿Las definiciones de la etiqueta cambian el resultado? |
 
 ## 6. Criterios de clasificación (P4)
 
@@ -76,13 +76,13 @@ Fijados el 18/11/2026 con las frecuencias de la auditoría de conteos (toda la p
 
 **Dicho antes de los resultados.** Los modelos prenatales de mortinato basados en características maternas suelen alcanzar una AUROC de 0,60 a 0,75. El framework clasifica un modelo como predictor solo con AUROC de 0,75 o más, así que este modelo podría quedar como *ninguno* si queda por debajo. El umbral no se cambia para este desenlace; cualquier propuesta de cambio debe decidirse con el director antes de ajustar el primer modelo.
 
-## 7. Requisitos (construidos por los otros proyectos)
+## 7. Datos que usa
 
-`mimiciv.cohort_obstetric_v2`, `mimiciv.hadm_delivery_v2` (MaternalMortality_MIMIC-IV_Cureus) y `mimiciv.fetal_death_label_v2` (PerinatalMortality_MIMIC-IV, tarea T16), más las tablas de MIMIC-IV `admissions`, `patients`, `diagnoses_icd`, `omr`, `labevents`.
+Tablas de MIMIC-IV `admissions`, `patients`, `diagnoses_icd`, `procedures_icd`, `omr`, `labevents` y `d_labitems`, y las tablas que construyen los scripts de `sql/00_cohort_and_label/`: `mimiciv.antenatal_obstetric_universe` (universo obstétrico y marca de parto) y `mimiciv.antenatal_fetal_death_label` (etiqueta por admisión).
 
 ## 8. Próximas tareas
 
-1. ~~Auditoría de conteos A1~~ (hecha el 18/11/2026, [`../count_audit_es.md`](../count_audit_es.md)).
+1. ~~Auditoría de conteos A1~~ (hecha, [`../count_audit_es.md`](../count_audit_es.md)).
 2. Tabla de predictores: `sql/02_predictors/01_predictor_table_es.sql` (tarea A2), una fila por admisión y margen.
 3. Verificación del tamaño de muestra con el R² de Cox-Snell observado (P3); conjunto reducido si hace falta.
 4. Validación anidada agrupada, criterios C1, C2 y C4, clasificación.

@@ -1,6 +1,6 @@
 # Auditoría de conteos — información disponible antes del ingreso (modelo prenatal)
 
-Ejecutada el 18/11/2026 con `sql/01_audit_counts/01_prior_information_es.sql` (inglés: `01_prior_information.sql`), tarea A1. Versión en inglés: [`count_audit.md`](count_audit.md).
+Ejecutada el 18/11/2026 con los scripts de `sql/00_cohort_and_label/` (población y etiqueta, tarea A0) y `sql/01_audit_counts/01_prior_information_es.sql` (información previa, tarea A1); las versiones en inglés no llevan el sufijo `_es`. Versión en inglés: [`count_audit.md`](count_audit.md).
 
 **Etapa del framework:** E4 (auditoría de conteos). Sus resultados fijan los predictores (E7) y los parámetros candidatos antes de la puerta de tamaño de muestra (P3).
 
@@ -17,7 +17,7 @@ El modelo prenatal solo puede usar lo que se sabía de la mujer **antes** del in
 ## 2. Cómo se midió
 
 - **Población:** hospitalizaciones de parto, más las admisiones con un código de mortinato que no quedaron marcadas como parto: 19.440 admisiones de 13.735 pacientes.
-- **Desenlace:** muerte fetal con definición estricta, es decir, un código de muerte fetal de todo el embarazo (CIE-10-CM O36.4, Z37.1, Z37.4, Z37.7; CIE-9-CM 656.4, V27.1, V27.4, V27.7): 129 eventos (0,66%). La etiqueta está en una tabla de la base con una fila por admisión (`fetal_death_label_v2`).
+- **Desenlace:** muerte fetal con definición estricta, es decir, un código de muerte fetal de todo el embarazo (CIE-10-CM O36.4, Z37.1, Z37.4, Z37.7; CIE-9-CM 656.4, V27.1, V27.4, V27.7): 129 eventos (0,66%). La etiqueta está en la tabla `antenatal_fetal_death_label`, con una fila por admisión (`sql/00_cohort_and_label/`).
 - **Ventana de información:** todo lo registrado **al menos 7 días antes** del ingreso (margen principal). Como sensibilidad se usaron 1 y 30 días. El margen evita usar información de una consulta en la que ya se había detectado la muerte fetal.
 - **Fuentes:**
   - hospitalizaciones anteriores en el mismo hospital (sus diagnósticos y procedimientos);
@@ -28,7 +28,65 @@ El modelo prenatal solo puede usar lo que se sabía de la mujer **antes** del in
   - en esta base, `omr.chartdate` es fecha y hora, así que se convirtió a fecha;
   - la columna de raza se llama `ethnicity`, como en las cargas anteriores de MIMIC-IV.
 
-## 3. Resultados por consulta
+## 3. Población y etiqueta (puerta de definición P1)
+
+Antes de medir la información previa se comprobó que la población y la etiqueta se construyen igual y reproducen los conteos de referencia. Es la condición de la puerta P1: población, unidad y definición fijas, y conteos reproducibles. Scripts: `sql/00_cohort_and_label/01_obstetric_universe_es.sql` y `02_fetal_death_label_es.sql`.
+
+### Q-U1. Universo obstétrico y población
+
+| Admisiones obstétricas | Pacientes | Hospitalizaciones de parto | Con código de mortinato | Población del modelo |
+|---|---|---|---|---|
+| 25.736 | 15.084 | 19.425 | 124 | 19.440 |
+
+**Qué significa.** El universo obstétrico son las admisiones de mujeres de 12 a 55 años con al menos un diagnóstico de embarazo, parto o puerperio. De ellas, 19.425 son hospitalizaciones de parto. De los 124 códigos de mortinato, 109 están dentro de partos y 15 quedan fuera de la marca de parto. Esas 15 se suman a la población: 19.425 + 15 = 19.440.
+
+### Q-U2. Población por era de codificación
+
+| Era | Partos | Código de mortinato sin marca de parto |
+|---|---|---|
+| CIE-10 | 8.883 | 10 |
+| CIE-9 | 10.542 | 5 |
+
+**Qué significa.** Las 15 admisiones con mortinato fuera de la marca de parto tienen también un código de aborto, que es la razón por la que la marca las excluye. Se mantienen en la población porque la muerte fetal es el desenlace. La población se reparte casi por mitades entre las dos eras de codificación.
+
+### Q-L1. Catálogo de códigos de muerte fetal
+
+| Nivel | CIE-9 | CIE-10 |
+|---|---|---|
+| Estricto | 4 | 4 |
+| Parcial | 2 | 3 |
+| Excluido | 3 | 2 |
+
+**Qué significa.** El catálogo tiene los 18 patrones previstos.
+- **Estrictos:** muerte fetal de todo el embarazo (O36.4, Z37.1, Z37.4, Z37.7; 656.4, V27.1, V27.4, V27.7).
+- **Parciales:** embarazos múltiples en los que murió algún feto.
+- **Excluidos:** la muerte fetal temprana (antes de 20 o 22 semanas) y los códigos del registro del recién nacido. Se listan solo para auditoría.
+
+### Q-L2. Conteos de referencia de la población
+
+| Admisiones | Pacientes | Eventos estrictos | Eventos con parciales |
+|---|---|---|---|
+| 19.440 | 13.735 | 129 | 142 |
+
+**Qué significa.** La población y el desenlace coinciden con los conteos de referencia. **La puerta P1 queda pasada.**
+
+### Q-L3. Tamaño de cada definición de la etiqueta
+
+| Definición | Eventos | Uso |
+|---|---|---|
+| Estricta, cualquier edad gestacional | 129 | Modelo principal |
+| Estricta más parcial | 142 | Sensibilidad |
+| Estricta sin código de pérdida temprana | 119 | Sensibilidad |
+| Estricta con 22 semanas o más | 55 | Sensibilidad (solo CIE-10) |
+| Estricta con 28 semanas o más | 37 | Sensibilidad (solo CIE-10) |
+| Estricta sin semanas de gestación | 61 | Se reportan aparte |
+| Estricta con código del registro del recién nacido | 0 | Control |
+
+**Qué significa.**
+1. Las semanas de gestación solo existen en CIE-10. Por eso las definiciones de 22 y 28 semanas tienen pocos eventos (55 y 37) y servirán para ver la dirección del resultado, no para un modelo propio.
+2. Ningún evento usa un código del registro del recién nacido, así que la etiqueta solo usa el registro de la madre.
+
+## 4. Información disponible antes del ingreso (Q-A0 a Q-A7)
 
 ### Q-A0. Verificación de la población
 
@@ -130,7 +188,7 @@ El porcentaje "con historia" se calcula sobre las 8.425 admisiones con alguna ho
 
 **Qué significa.**
 1. Los antecedentes frecuentes (más de 1% de la población) tienen suficientes casos para que el modelo aprenda de ellos.
-2. Los raros (menos de 1%) aportan como mucho uno o dos eventos cada uno. El modelo no puede aprender algo estable de ellos, y cada uno gastaría uno de los 17 a 25 parámetros que soportan los datos (sección 4).
+2. Los raros (menos de 1%) aportan como mucho uno o dos eventos cada uno. El modelo no puede aprender algo estable de ellos, y cada uno gastaría uno de los 17 a 25 parámetros que soportan los datos (sección 5).
 3. La muerte fetal anterior es el factor de riesgo más fuerte en la literatura, pero aquí es muy rara (52 admisiones).
 
 **Para el modelo** (decidido solo con estas frecuencias y razones clínicas, sin mirar el desenlace).
@@ -220,7 +278,7 @@ El porcentaje "con historia" se calcula sobre las 8.425 admisiones con alguna ho
 | Idioma | inglés, otro o faltante | 1 |
 | Estado civil | casada, no casada, faltante | 2 |
 
-## 4. Lo que la auditoría deja para el modelo
+## 5. Lo que la auditoría deja para el modelo
 
 ### Parámetros que soportan los datos
 

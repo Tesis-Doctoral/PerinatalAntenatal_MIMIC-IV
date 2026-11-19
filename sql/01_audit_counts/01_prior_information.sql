@@ -13,7 +13,7 @@
 --   values (labevents without hadm_id) charted at or before t0 - B.
 -- Buffers: 7 days (main), 1 and 30 days (sensitivity).
 --
--- Rule against selection by outcome (as decision D10 of the perinatal plan): availability of a
+-- Rule against selection by outcome: availability of a
 -- whole BLOCK of information is shown for events and non-events (Q-A1 to Q-A3), because it
 -- decides whether the model is feasible. The frequency of each single condition (Q-A4 to Q-A7) is
 -- shown for the whole population only, never split by outcome, so that no predictor is chosen
@@ -23,8 +23,8 @@
 -- do NOT publish rows with subject_id or hadm_id, and show counts under 5 as "<5" in any
 -- published file.
 --
--- Prerequisites: mimiciv.fetal_death_label_v2 (PerinatalMortality_MIMIC-IV, task T16),
--- mimiciv.cohort_obstetric_v2 (MaternalMortality_MIMIC-IV_Cureus), and the MIMIC-IV hosp tables
+-- Prerequisites: derived tables mimiciv.antenatal_fetal_death_label (label by admission) and
+-- mimiciv.antenatal_obstetric_universe (obstetric universe), built by sql/00_cohort_and_label/, and the MIMIC-IV hosp tables
 -- admissions, patients, diagnoses_icd, procedures_icd, omr, labevents, d_labitems.
 -- The outpatient laboratory tables (step 0.5) read labevents for the patients of the
 -- population; it can take several minutes.
@@ -36,7 +36,7 @@
 SET search_path TO mimiciv, public;
 
 -- ----------------------------------------------------------------------------
--- 0.1 Population (decision D3 of the perinatal project) and buffers
+-- 0.1 Population (delivery hospitalizations plus admissions with a stillbirth code) and buffers
 -- ----------------------------------------------------------------------------
 DROP TABLE IF EXISTS tmp_ai_base;
 CREATE TEMP TABLE tmp_ai_base AS
@@ -45,8 +45,8 @@ SELECT l.subject_id, l.hadm_id, l.admittime AS t0, l.icd_era, l.anchor_year_grou
        CASE WHEN l.fd_strict THEN '1 strict event'
             WHEN l.fd_any    THEN '2 partial-only event'
             ELSE                  '3 non-event' END AS ev_group
-FROM   mimiciv.fetal_death_label_v2 l
-WHERE  l.in_pop_d3;
+FROM   mimiciv.antenatal_fetal_death_label l
+WHERE  l.in_population;
 CREATE INDEX ON tmp_ai_base (subject_id);
 
 DROP TABLE IF EXISTS tmp_ai_buffer;
@@ -66,7 +66,7 @@ JOIN   mimiciv.admissions a2
        ON  a2.subject_id = b.subject_id
        AND a2.hadm_id   <> b.hadm_id
        AND a2.dischtime <= b.t0 - make_interval(days => bf.buffer_days)
-LEFT JOIN mimiciv.cohort_obstetric_v2 c2 ON c2.hadm_id = a2.hadm_id;
+LEFT JOIN mimiciv.antenatal_obstetric_universe c2 ON c2.hadm_id = a2.hadm_id;
 
 -- ----------------------------------------------------------------------------
 -- 0.3 Conditions recorded in earlier admissions (main buffer of 7 days)
@@ -113,7 +113,7 @@ SELECT p.hadm_id,
                          AND ((pr.icd_version = 10 AND pr.icd_code IN ('10D00Z0','10D00Z1','10D00Z2'))
                            OR (pr.icd_version = 9  AND pr.icd_code ~ '^(740|741|742|744|7499)')))) AS hx_cesarean
 FROM   tmp_ai_prior_adm p
-LEFT JOIN mimiciv.fetal_death_label_v2 l2 ON l2.hadm_id = p.prior_hadm_id
+LEFT JOIN mimiciv.antenatal_fetal_death_label l2 ON l2.hadm_id = p.prior_hadm_id
 WHERE  p.buffer_days = 7
 GROUP  BY p.hadm_id;
 

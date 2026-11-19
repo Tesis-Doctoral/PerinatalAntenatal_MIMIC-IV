@@ -1,6 +1,6 @@
 # Antenatal prediction of fetal death in MIMIC-IV
 
-Can a high risk of fetal death be seen **before** the delivery admission, using only what was known about the woman beforehand? This project is the antenatal model of the thesis outcome *perinatal death before birth*. It is return R3 (another prediction point) of the staged framework, opened because the model at admission + 6 h (`PerinatalMortality_MIMIC-IV`) found that most fetal deaths were already present at its prediction point.
+Can a high risk of fetal death be seen **before** the delivery admission, using only what was known about the woman beforehand? When the woman arrives at the hospital, the fetal death has often already happened; so this model uses only information from before the admission, and the event happens after the information that predicts it. It follows the staged framework for clinical prediction models.
 
 > **Status (2026-11-18): count audit done.** Outcome card written; the audit of the information available before the admission was run (task A1). Next: predictor table.
 
@@ -8,25 +8,30 @@ Can a high risk of fetal death be seen **before** the delivery admission, using 
 
 ## Scope
 
-- **Outcome:** fetal death identified from the mother's ICD codes (strict definition, 129 events in 19,440 delivery hospitalizations), always labelled a proxy. Same label as `PerinatalMortality_MIMIC-IV`.
+- **Outcome:** fetal death identified from the mother's ICD codes (strict definition, 129 events in 19,440 delivery hospitalizations), always labelled a proxy.
 - **Prediction point:** admission time of the delivery hospitalization.
 - **Information:** only what was recorded at least 7 days before the admission (earlier admissions, outpatient measurements, outpatient laboratory values) plus patient attributes (age, race and ethnicity, insurance, language, marital status). Nothing of the current admission.
 - **Framework:** [`framework.md`](framework.md) (Spanish: [`framework_es.md`](framework_es.md)), version 1.0. Outcome card: [`docs/outcome_card_antenatal.md`](docs/outcome_card_antenatal.md) (Spanish: [`docs/outcome_card_antenatal_es.md`](docs/outcome_card_antenatal_es.md)).
 
 The count audit of the information available before the admission (run 2026-11-18) is written up in [`count_audit.md`](count_audit.md) (Spanish: [`count_audit_es.md`](count_audit_es.md)): every query, what it showed and what it means for the predictors.
 
-## Prerequisites
+## Requirements and run order
 
-The cohort and the label are built by the companion projects and read from the same local MIMIC-IV database:
+A local PostgreSQL database with MIMIC-IV v3.1 (hosp module). Every table of the model is built from this repository, with names starting with `antenatal_`, so no other table of the database is modified. Run each script as a whole in one connection (DBeaver: Alt+X), in this order:
 
-| Table | Built by |
-|---|---|
-| `mimiciv.cohort_obstetric_v2`, `mimiciv.hadm_delivery_v2` | `MaternalMortality_MIMIC-IV_Cureus` |
-| `mimiciv.fetal_death_label_v2` | `PerinatalMortality_MIMIC-IV` (task T16) |
+| Order | Script | Creates | Framework stage |
+|---|---|---|---|
+| 1 | `sql/00_cohort_and_label/01_obstetric_universe.sql` | `antenatal_obstetric_universe` (obstetric universe, delivery flag) | S2 |
+| 2 | `sql/00_cohort_and_label/02_fetal_death_label.sql` | `antenatal_fetal_death_codes`, `antenatal_fetal_death_label` (label by admission) | S3, G1 |
+| 3 | `sql/01_audit_counts/01_prior_information.sql` | Nothing (read-only): count audit | S4 |
+| 4 | `sql/02_predictors/01_predictor_table.sql` | `antenatal_predictors_v1` (predictor table read by the models) | S6, S7 |
+
+Reference counts to reproduce: 25,736 obstetric admissions; 19,440 admissions in the population of the model, of 13,735 patients; 129 strict events and 142 with partial codes.
 
 ## Repository structure
 
 ```
+sql/00_cohort_and_label/ Obstetric universe, delivery flag, code catalogue and fetal-death label
 sql/01_audit_counts/   Counts of the information available before the admission (read-only, aggregate output)
 sql/02_predictors/     Predictor table of the information window
 notebooks/             Models, validation and classification

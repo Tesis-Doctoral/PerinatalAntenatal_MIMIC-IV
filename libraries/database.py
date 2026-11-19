@@ -3,7 +3,7 @@
 database.py -- Antenatal prediction of fetal death, MIMIC-IV
 
 Connection helpers for the local PostgreSQL instance that holds the MIMIC-IV schema
-(the same database used by MaternalMortality_MIMIC-IV_Cureus and PerinatalMortality_MIMIC-IV).
+.
 All parameters come from environment variables (see .env.example), so no credential
 is ever committed.
 """

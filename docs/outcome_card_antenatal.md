@@ -1,22 +1,22 @@
 # Outcome card — antenatal prediction of fetal death, MIMIC-IV
 
-Version 2, 2026-11-18 (version 1 of the same day, updated with the count audit A1: [`../count_audit.md`](../count_audit.md)). Third application of the staged framework ([`../framework.md`](../framework.md), version 1.0). It is return **R3** (another prediction point) of the outcome *perinatal death before birth*, whose first model (`PerinatalMortality_MIMIC-IV`, prediction at admission + 6 h) found that 73 of 129 fetal deaths were already present at the prediction point (count audit group G, task T45). Fields marked **pending** are fixed, and recorded in the decision log, before the gate that needs them. Spanish version: [`outcome_card_antenatal_es.md`](outcome_card_antenatal_es.md).
+Outcome card of the antenatal model, following the staged framework ([`../framework.md`](../framework.md)). Fields marked **pending** are fixed, and recorded in the decision log, before the gate that needs them. Spanish version: [`outcome_card_antenatal_es.md`](outcome_card_antenatal_es.md).
 
 ## 1. The question
 
-At admission, the fetal death has often already happened: a model at admission + 6 h recognizes it (early identifier). This model asks a different question: **with what was known about the woman before this admission, could a high risk of fetal death be seen?** Only information recorded before the admission enters the model, so the event happens after the information that predicts it.
+When the woman arrives at the hospital, the fetal death has often already happened: a model using information from the admission would recognize it, but would not predict it. So this model asks the question before the admission: **with what was known about the woman before this admission, could a high risk of fetal death be seen?** Only information recorded before the admission enters the model, so the event happens after the information that predicts it.
 
 ## 2. Identity
 
-| Field | Value | Source |
-|---|---|---|
-| Outcome | Perinatal death before birth (fetal death or stillbirth), always labelled a proxy | perinatal D2 |
-| Rung | Same outcome; new prediction point (return R3) | — |
-| Data source | MIMIC-IV v3.1; tables of the maternal and perinatal projects (section 7) | — |
-| Unit and group | Delivery hospitalization; patient as grouping unit | perinatal D4 |
-| Population | Population of perinatal D3: delivery flag (v2) or stillbirth code, 19,440 admissions | perinatal D3 |
-| Main label | Strict code at any gestational age (`fetal_death_label_v2.label_main`): 129 events (0.66%) | perinatal D5, T16 |
-| Sensitivity labels | Strict plus partial; 22 and 28 weeks or more (ICD-10 only); without early-loss codes | perinatal D5 |
+| Field | Value |
+|---|---|
+| Outcome | Perinatal death before birth (fetal death or stillbirth), identified from the mother's ICD codes and always labelled a proxy |
+| Rung | Ideal outcome (first rung of the outcome ladder) |
+| Data source | MIMIC-IV v3.1 (section 7) |
+| Unit and group | Delivery hospitalization; patient as grouping unit (partitions never split a patient) |
+| Population | Delivery hospitalizations, plus admissions with a stillbirth code that were not flagged as deliveries: 19,440 admissions of 13,735 patients |
+| Main label | Strict code of fetal death at any gestational age (ICD-10-CM O36.4, Z37.1, Z37.4, Z37.7; ICD-9-CM 656.4, V27.1, V27.4, V27.7): 129 events (0.66%) |
+| Sensitivity labels | Strict plus partial (multiple pregnancies where some fetus died); 22 and 28 weeks or more (ICD-10 only, where gestational weeks exist); without early-loss codes |
 
 ## 3. Prediction point and information window (S6)
 
@@ -52,9 +52,9 @@ Fixed on 2026-11-18 from the frequencies of the count audit (whole population, n
 | Field | Value |
 |---|---|
 | Candidate parameters | 27 |
-| Supported parameters | About 17 to 25, from the perinatal pre-estimate (same events and prevalence); the gate uses the observed Cox-Snell R² |
+| Supported parameters | About 17 to 25 by the criteria of Riley et al. with 19,440 admissions and 129 events, if the Cox-Snell R² is 10% or 15% of its maximum; the gate uses the observed R² |
 | Primary learner | Penalized logistic regression (events per parameter below 20); tree models and the ensemble as comparisons |
-| Reduced predictor set (17 parameters) | Age; race and ethnicity (4); Medicaid; English; married; had prenatal care in this hospital; last systolic; elevated pressure; body mass index; hemoglobin; hypertensive history (chronic or in an earlier pregnancy); diabetes (pregestational or gestational in an earlier pregnancy); adverse outcome in an earlier pregnancy. Fixed on 2026-11-18, before any model; never chosen by association with the outcome |
+| Reduced predictor set (17 parameters) | Age; race and ethnicity (4); Medicaid; English; married; had prenatal care in this hospital; last systolic; elevated pressure; body mass index; hemoglobin; hypertensive history (chronic or in an earlier pregnancy); diabetes (pregestational or gestational in an earlier pregnancy); adverse outcome in an earlier pregnancy. Fixed before any model; never chosen by association with the outcome |
 
 ## 5b. Sensitivity analyses
 
@@ -63,7 +63,7 @@ Fixed on 2026-11-18 from the frequencies of the count audit (whole population, n
 | Buffers of 1 and 30 days | Does the result depend on the buffer? |
 | Only patients with any earlier information (99 events) | Does the result depend on who has a history in this hospital? |
 | Calibration by period | Does the model work the same in periods with less history (C4; the audit found less information in recent periods) |
-| Strict plus partial; 22 and 28 weeks or more; without early-loss codes | Do the label definitions change the result? (perinatal D5) |
+| Strict plus partial; 22 and 28 weeks or more; without early-loss codes | Do the label definitions change the result? |
 
 ## 6. Classification criteria (G4)
 
@@ -76,13 +76,13 @@ Fixed on 2026-11-18 from the frequencies of the count audit (whole population, n
 
 **Stated before the results.** Antenatal models of stillbirth built on maternal characteristics usually reach an AUROC of about 0.60 to 0.75. The framework classifies a model as a predictor only with an AUROC of 0.75 or more, so this model may be classified as *neither* if it falls below that. The threshold is not changed for this outcome; any proposal to change it must be decided with the supervisor before the first model is fitted.
 
-## 7. Prerequisites (built by the other projects)
+## 7. Data used
 
-`mimiciv.cohort_obstetric_v2`, `mimiciv.hadm_delivery_v2` (MaternalMortality_MIMIC-IV_Cureus) and `mimiciv.fetal_death_label_v2` (PerinatalMortality_MIMIC-IV, task T16), plus the MIMIC-IV tables `admissions`, `patients`, `diagnoses_icd`, `omr`, `labevents`.
+MIMIC-IV tables `admissions`, `patients`, `diagnoses_icd`, `procedures_icd`, `omr`, `labevents` and `d_labitems`, and the tables built by the scripts of `sql/00_cohort_and_label/`: `mimiciv.antenatal_obstetric_universe` (obstetric universe and delivery flag) and `mimiciv.antenatal_fetal_death_label` (label by admission).
 
 ## 8. Next tasks
 
-1. ~~Count audit A1~~ (done 2026-11-18, [`../count_audit.md`](../count_audit.md)).
+1. ~~Count audit A1~~ (done, [`../count_audit.md`](../count_audit.md)).
 2. Predictor table: `sql/02_predictors/01_predictor_table.sql` (task A2), one row per admission and buffer.
 3. Sample-size check with the observed Cox-Snell R² (G3); reduced set if needed.
 4. Nested grouped validation, criteria C1, C2 and C4, classification.

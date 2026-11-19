@@ -1,6 +1,6 @@
 # Count audit — information available before the admission (antenatal model)
 
-Run on 2026-11-18 with `sql/01_audit_counts/01_prior_information.sql` (Spanish: `01_prior_information_es.sql`), task A1. Spanish version: [`count_audit_es.md`](count_audit_es.md).
+Run on 2026-11-18 with the scripts of `sql/00_cohort_and_label/` (population and label, task A0) and `sql/01_audit_counts/01_prior_information.sql` (earlier information, task A1); the Spanish versions carry the suffix `_es`. Spanish version: [`count_audit_es.md`](count_audit_es.md).
 
 **Framework stage:** S4 (count audit). Its results fix the predictors (S7) and the candidate parameters before the sample-size gate (G3).
 
@@ -17,7 +17,7 @@ The antenatal model may use only what was known about the woman **before** the d
 ## 2. How it was measured
 
 - **Population:** delivery hospitalizations, plus admissions with a stillbirth code that were not flagged as deliveries: 19,440 admissions of 13,735 patients.
-- **Outcome:** fetal death with the strict definition, that is, a code of fetal death of the whole pregnancy (ICD-10-CM O36.4, Z37.1, Z37.4, Z37.7; ICD-9-CM 656.4, V27.1, V27.4, V27.7): 129 events (0.66%). The label is in a database table with one row per admission (`fetal_death_label_v2`).
+- **Outcome:** fetal death with the strict definition, that is, a code of fetal death of the whole pregnancy (ICD-10-CM O36.4, Z37.1, Z37.4, Z37.7; ICD-9-CM 656.4, V27.1, V27.4, V27.7): 129 events (0.66%). The label is in the table `antenatal_fetal_death_label`, with one row per admission (`sql/00_cohort_and_label/`).
 - **Information window:** everything recorded **at least 7 days before** the admission (main buffer). Buffers of 1 and 30 days are sensitivity analyses. The buffer keeps out information from a visit at which the fetal death had already been found.
 - **Sources:**
   - earlier admissions to the same hospital (their diagnoses and procedures);
@@ -28,7 +28,65 @@ The antenatal model may use only what was known about the woman **before** the d
   - in this database `omr.chartdate` is a timestamp, so it was cast to a date;
   - the race column is called `ethnicity`, as in earlier loads of MIMIC-IV.
 
-## 3. Results by query
+## 3. Population and label (definition gate G1)
+
+Before measuring the earlier information, we checked that the population and the label are built the same way and reproduce the reference counts. This is the condition of gate G1: population, unit and definition fixed, and counts reproducible. Scripts: `sql/00_cohort_and_label/01_obstetric_universe.sql` and `02_fetal_death_label.sql`.
+
+### Q-U1. Obstetric universe and population
+
+| Obstetric admissions | Patients | Delivery hospitalizations | With a stillbirth code | Population of the model |
+|---|---|---|---|---|
+| 25,736 | 15,084 | 19,425 | 124 | 19,440 |
+
+**What it means.** The obstetric universe is the admissions of women aged 12 to 55 with at least one diagnosis of pregnancy, delivery or the puerperium. Of them, 19,425 are delivery hospitalizations. Of the 124 stillbirth codes, 109 are within deliveries and 15 fall outside the delivery flag. Those 15 are added to the population: 19,425 + 15 = 19,440.
+
+### Q-U2. Population by coding era
+
+| Era | Deliveries | Stillbirth code without delivery flag |
+|---|---|---|
+| ICD-10 | 8,883 | 10 |
+| ICD-9 | 10,542 | 5 |
+
+**What it means.** The 15 stillbirth admissions outside the delivery flag also carry an abortive code, which is why the flag excludes them. They stay in the population because fetal death is the outcome. The population is split almost in half between the two coding eras.
+
+### Q-L1. Fetal-death code catalogue
+
+| Tier | ICD-9 | ICD-10 |
+|---|---|---|
+| Strict | 4 | 4 |
+| Partial | 2 | 3 |
+| Excluded | 3 | 2 |
+
+**What it means.** The catalogue has the 18 expected patterns.
+- **Strict:** fetal death of the whole pregnancy (O36.4, Z37.1, Z37.4, Z37.7; 656.4, V27.1, V27.4, V27.7).
+- **Partial:** multiple pregnancies in which some fetus died.
+- **Excluded:** early fetal death (before 20 or 22 weeks) and newborn-record codes. They are listed for audit only.
+
+### Q-L2. Reference counts of the population
+
+| Admissions | Patients | Strict events | Events with partial codes |
+|---|---|---|---|
+| 19,440 | 13,735 | 129 | 142 |
+
+**What it means.** The population and the outcome match the reference counts. **Gate G1 is passed.**
+
+### Q-L3. Size of every label definition
+
+| Definition | Events | Use |
+|---|---|---|
+| Strict, any gestational age | 129 | Main model |
+| Strict plus partial | 142 | Sensitivity |
+| Strict without an early-loss code | 119 | Sensitivity |
+| Strict at 22 weeks or more | 55 | Sensitivity (ICD-10 only) |
+| Strict at 28 weeks or more | 37 | Sensitivity (ICD-10 only) |
+| Strict without gestational weeks | 61 | Reported separately |
+| Strict with a newborn-record code | 0 | Control |
+
+**What it means.**
+1. Gestational weeks exist only in ICD-10. That is why the 22- and 28-week definitions have few events (55 and 37); they will show the direction of the result, not support a model of their own.
+2. No event uses a newborn-record code, so the label uses only the mother's record.
+
+## 4. Information available before the admission (Q-A0 to Q-A7)
 
 ### Q-A0. Population check
 
@@ -130,7 +188,7 @@ The percentage "with history" is computed over the 8,425 admissions with any ear
 
 **What it means.**
 1. Frequent conditions (more than 1% of the population) have enough cases for the model to learn from them.
-2. Rare ones (under 1%) contribute at most one or two events each. The model cannot learn anything stable from them, and each would use one of the 17 to 25 parameters the data support (section 4).
+2. Rare ones (under 1%) contribute at most one or two events each. The model cannot learn anything stable from them, and each would use one of the 17 to 25 parameters the data support (section 5).
 3. Earlier fetal death is the strongest risk factor in the literature, but here it is very rare (52 admissions).
 
 **For the model** (decided only from these frequencies and clinical reasons, without looking at the outcome).
@@ -220,7 +278,7 @@ The percentage "with history" is computed over the 8,425 admissions with any ear
 | Language | English, other or missing | 1 |
 | Marital status | married, not married, missing | 2 |
 
-## 4. What the audit leaves for the model
+## 5. What the audit leaves for the model
 
 ### Parameters the data support
 

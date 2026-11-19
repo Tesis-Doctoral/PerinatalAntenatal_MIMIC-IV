@@ -22,8 +22,8 @@
 --   sistólica 60-250 mmHg, diastólica 30-150 mmHg, índice de masa corporal 12-80 kg/m2, peso 70-600 lb,
 --   talla 48-84 pulgadas, hemoglobina 3-20 g/dL.
 --
--- Requisitos: mimiciv.fetal_death_label_v2 (PerinatalMortality_MIMIC-IV, tarea T16),
--- mimiciv.cohort_obstetric_v2 (MaternalMortality_MIMIC-IV_Cureus), tablas hosp de MIMIC-IV
+-- Requisitos: tablas derivadas mimiciv.antenatal_fetal_death_label (etiqueta por admisión) y
+-- mimiciv.antenatal_obstetric_universe (universo obstétrico), construidas por sql/00_cohort_and_label/, tablas hosp de MIMIC-IV
 -- admissions, patients, diagnoses_icd, procedures_icd, omr, labevents, d_labitems.
 -- En esta base la columna de raza se llama 'ethnicity' y omr.chartdate es fecha y hora (timestamp).
 --
@@ -43,9 +43,9 @@ CREATE TEMP TABLE tmp_ap_base AS
 SELECT l.subject_id, l.hadm_id, l.admittime AS t0, bf.buffer_days,
        (l.admittime - make_interval(days => bf.buffer_days))            AS t_info_end,
        (l.admittime - INTERVAL '280 days')                              AS t_preg_start
-FROM   mimiciv.fetal_death_label_v2 l
+FROM   mimiciv.antenatal_fetal_death_label l
 CROSS JOIN (VALUES (1), (7), (30)) AS bf(buffer_days)
-WHERE  l.in_pop_d3;
+WHERE  l.in_population;
 CREATE INDEX ON tmp_ap_base (subject_id);
 CREATE INDEX ON tmp_ap_base (hadm_id, buffer_days);
 
@@ -78,7 +78,7 @@ SELECT p.hadm_id, p.buffer_days,
        BOOL_OR(COALESCE(l2.label_main, FALSE) OR COALESCE(dx.hx_preterm_delivery, FALSE))       AS hx_adverse_pregnancy_outcome,
        BOOL_OR(COALESCE(dx.hx_other_high_risk_chronic, FALSE))                                  AS hx_other_high_risk_chronic
 FROM   tmp_ap_prior p
-LEFT JOIN mimiciv.fetal_death_label_v2 l2 ON l2.hadm_id = p.prior_hadm_id
+LEFT JOIN mimiciv.antenatal_fetal_death_label l2 ON l2.hadm_id = p.prior_hadm_id
 LEFT JOIN (
     SELECT d.hadm_id,
            BOOL_OR((d.icd_version = 10 AND d.icd_code ~ '^O601')
@@ -243,7 +243,7 @@ SELECT
     b.subject_id                                                        AS group_id,
     b.hadm_id, b.subject_id, b.buffer_days,
     b.t0, b.t_info_end,
-    -- etiquetas (D5 perinatal) y período
+    -- etiquetas (definición principal y de sensibilidad) y período
     l.label_main, l.label_strict_partial, l.label_ge22, l.label_ge28, l.has_early_loss_code,
     l.icd_era, l.anchor_year_group,
     -- registro
@@ -287,7 +287,7 @@ SELECT
     (COALESCE(h.hx_chronic_hypertension, FALSE) OR COALESCE(h.hx_hypertensive_pregnancy, FALSE)) AS hx_hypertension_any,
     (COALESCE(h.hx_pregestational_diabetes, FALSE) OR COALESCE(h.hx_gestational_diabetes, FALSE)) AS hx_diabetes_any
 FROM   tmp_ap_base b
-JOIN   mimiciv.fetal_death_label_v2 l ON l.hadm_id     = b.hadm_id
+JOIN   mimiciv.antenatal_fetal_death_label l ON l.hadm_id     = b.hadm_id
 JOIN   mimiciv.admissions          a  ON a.hadm_id     = b.hadm_id
 JOIN   mimiciv.patients            pt ON pt.subject_id = b.subject_id
 LEFT JOIN tmp_ap_hist     h  ON h.hadm_id  = b.hadm_id AND h.buffer_days  = b.buffer_days
