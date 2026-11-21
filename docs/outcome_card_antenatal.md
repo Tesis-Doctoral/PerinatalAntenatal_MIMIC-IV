@@ -54,6 +54,7 @@ Fixed on 2026-11-18 from the frequencies of the count audit (whole population, n
 | Candidate parameters | 27 |
 | Supported parameters | About 17 to 25 by the criteria of Riley et al. with 19,440 admissions and 129 events, if the Cox-Snell R² is 10% or 15% of its maximum; the gate uses the observed R² |
 | Primary learner | Penalized logistic regression (events per parameter below 20); tree models and the ensemble as comparisons |
+| Missing values | Multiple imputation by chained equations, fitted only on the training data of each validation split and applied to its test data. The indicator "had prenatal care in this hospital" is the only missingness indicator; no parameters are added (27). Pressure is missing in 38.7%, hemoglobin in 41.2% and BMI in 57.3% ([`../predictor_table.md`](../predictor_table.md)). Decided on 2026-11-19, before any model; pending validation by the supervisor |
 | Reduced predictor set (17 parameters) | Age; race and ethnicity (4); Medicaid; English; married; had prenatal care in this hospital; last systolic; elevated pressure; body mass index; hemoglobin; hypertensive history (chronic or in an earlier pregnancy); diabetes (pregestational or gestational in an earlier pregnancy); adverse outcome in an earlier pregnancy. Fixed before any model; never chosen by association with the outcome |
 
 ## 5b. Sensitivity analyses
@@ -83,8 +84,8 @@ MIMIC-IV tables `admissions`, `patients`, `diagnoses_icd`, `procedures_icd`, `om
 ## 8. Next tasks
 
 1. ~~Count audit A1~~ (done, [`../count_audit.md`](../count_audit.md)).
-2. Predictor table: `sql/02_predictors/01_predictor_table.sql` (task A2), one row per admission and buffer.
-3. Sample-size check with the observed Cox-Snell R² (G3); reduced set if needed.
+2. ~~Predictor table A2~~ (done 2026-11-19, [`../predictor_table.md`](../predictor_table.md)). Missing values: multiple imputation (section 5).
+3. ~~Sample-size gate G3~~ (2026-11-20): **not passed**. Observed cross-validated Cox-Snell R²: −0.00054 (−0.7% of the maximum); the reduced set of 17 would not pass either (minimum 0.0124 for 27 parameters and 0.0078 for 17). The outcome is reported as a feasibility analysis.
 4. Nested grouped validation, criteria C1, C2 and C4, classification.
 
 *Confidential: internal use of the research project.*

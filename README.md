@@ -1,8 +1,10 @@
 # Antenatal prediction of fetal death in MIMIC-IV
 
+> **Framework.** This repository applies the thesis's staged framework for clinical prediction models. The framework (stages, gates, criteria and literature) and the catalogue of models with their status are in [StagedFramework_ClinicalPrediction](https://github.com/khem777/StagedFramework_ClinicalPrediction).
+
 Can a high risk of fetal death be seen **before** the delivery admission, using only what was known about the woman beforehand? When the woman arrives at the hospital, the fetal death has often already happened; so this model uses only information from before the admission, and the event happens after the information that predicts it. It follows the staged framework for clinical prediction models.
 
-> **Status (2026-11-18): count audit done.** Outcome card written; the audit of the information available before the admission was run (task A1). Next: predictor table.
+> **Status (2026-11-19): predictor table built and verified** ([`predictor_table.md`](predictor_table.md)). Sample-size gate (G3) **not passed**: cross-validated Cox-Snell R² of −0.00054 (minimum for 27 parameters: 0.0124; for 17: 0.0078). The antenatal model is reported as a feasibility analysis ([`data/outputs_01_sample_size_gate.txt`](data/outputs_01_sample_size_gate.txt)).
 
 [Versión en español](README_es.md)
 
@@ -25,6 +27,7 @@ A local PostgreSQL database with MIMIC-IV v3.1 (hosp module). Every table of the
 | 2 | `sql/00_cohort_and_label/02_fetal_death_label.sql` | `antenatal_fetal_death_codes`, `antenatal_fetal_death_label` (label by admission) | S3, G1 |
 | 3 | `sql/01_audit_counts/01_prior_information.sql` | Nothing (read-only): count audit | S4 |
 | 4 | `sql/02_predictors/01_predictor_table.sql` | `antenatal_predictors_v1` (predictor table read by the models) | S6, S7 |
+| 5 | `notebooks/01_sample_size_gate.ipynb` | `data/outputs_01_sample_size_gate.txt` (sample-size gate) | G3 |
 
 Reference counts to reproduce: 25,736 obstetric admissions; 19,440 admissions in the population of the model, of 13,735 patients; 129 strict events and 142 with partial codes.
 

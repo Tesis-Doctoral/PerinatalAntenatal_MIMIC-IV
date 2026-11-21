@@ -156,36 +156,51 @@ FROM   tmp_ap_omr_val;
 -- Last value of each measurement in the current-pregnancy window (height: any time before the window end)
 DROP TABLE IF EXISTS tmp_ap_omr_last;
 CREATE TEMP TABLE tmp_ap_omr_last AS
+WITH preg AS (
+    SELECT * FROM tmp_ap_omr_clean WHERE in_pregnancy_window
+),
+bp AS (
+    SELECT DISTINCT ON (hadm_id, buffer_days) hadm_id, buffer_days, sbp, dbp
+    FROM   preg WHERE sbp IS NOT NULL
+    ORDER  BY hadm_id, buffer_days, chartdate DESC, seq_num DESC
+),
+el AS (
+    SELECT hadm_id, buffer_days, BOOL_OR(sbp >= 140 OR dbp >= 90) AS any_elevated_bp
+    FROM   preg WHERE sbp IS NOT NULL
+    GROUP  BY hadm_id, buffer_days
+),
+bm AS (
+    SELECT DISTINCT ON (hadm_id, buffer_days) hadm_id, buffer_days, bmi
+    FROM   preg WHERE bmi IS NOT NULL
+    ORDER  BY hadm_id, buffer_days, chartdate DESC, seq_num DESC
+),
+w AS (
+    SELECT DISTINCT ON (hadm_id, buffer_days) hadm_id, buffer_days, weight_lb
+    FROM   preg WHERE weight_lb IS NOT NULL
+    ORDER  BY hadm_id, buffer_days, chartdate DESC, seq_num DESC
+),
+h AS (
+    SELECT DISTINCT ON (hadm_id, buffer_days) hadm_id, buffer_days, height_in
+    FROM   tmp_ap_omr_clean WHERE height_in IS NOT NULL
+    ORDER  BY hadm_id, buffer_days, chartdate DESC, seq_num DESC
+),
+pc AS (
+    SELECT DISTINCT hadm_id, buffer_days FROM preg
+)
 SELECT b.hadm_id, b.buffer_days,
        bp.sbp AS last_sbp, bp.dbp AS last_dbp,
        COALESCE(el.any_elevated_bp, FALSE)                              AS any_elevated_bp,
        bm.bmi AS last_bmi_recorded,
        w.weight_lb AS last_weight_lb,
        h.height_in AS last_height_in,
-       COALESCE(pc.any_pregnancy_measurement, FALSE)                    AS any_pregnancy_measurement
+       (pc.hadm_id IS NOT NULL)                                         AS any_pregnancy_measurement
 FROM   (SELECT DISTINCT hadm_id, buffer_days FROM tmp_ap_base) b
-LEFT JOIN LATERAL (SELECT c.sbp, c.dbp FROM tmp_ap_omr_clean c
-                   WHERE c.hadm_id = b.hadm_id AND c.buffer_days = b.buffer_days
-                     AND c.in_pregnancy_window AND c.sbp IS NOT NULL
-                   ORDER BY c.chartdate DESC, c.seq_num DESC LIMIT 1) bp ON TRUE
-LEFT JOIN LATERAL (SELECT BOOL_OR(c.sbp >= 140 OR c.dbp >= 90) AS any_elevated_bp FROM tmp_ap_omr_clean c
-                   WHERE c.hadm_id = b.hadm_id AND c.buffer_days = b.buffer_days
-                     AND c.in_pregnancy_window AND c.sbp IS NOT NULL) el ON TRUE
-LEFT JOIN LATERAL (SELECT c.bmi FROM tmp_ap_omr_clean c
-                   WHERE c.hadm_id = b.hadm_id AND c.buffer_days = b.buffer_days
-                     AND c.in_pregnancy_window AND c.bmi IS NOT NULL
-                   ORDER BY c.chartdate DESC, c.seq_num DESC LIMIT 1) bm ON TRUE
-LEFT JOIN LATERAL (SELECT c.weight_lb FROM tmp_ap_omr_clean c
-                   WHERE c.hadm_id = b.hadm_id AND c.buffer_days = b.buffer_days
-                     AND c.in_pregnancy_window AND c.weight_lb IS NOT NULL
-                   ORDER BY c.chartdate DESC, c.seq_num DESC LIMIT 1) w ON TRUE
-LEFT JOIN LATERAL (SELECT c.height_in FROM tmp_ap_omr_clean c
-                   WHERE c.hadm_id = b.hadm_id AND c.buffer_days = b.buffer_days
-                     AND c.height_in IS NOT NULL
-                   ORDER BY c.chartdate DESC, c.seq_num DESC LIMIT 1) h ON TRUE
-LEFT JOIN LATERAL (SELECT TRUE AS any_pregnancy_measurement FROM tmp_ap_omr_clean c
-                   WHERE c.hadm_id = b.hadm_id AND c.buffer_days = b.buffer_days
-                     AND c.in_pregnancy_window LIMIT 1) pc ON TRUE;
+LEFT JOIN bp ON bp.hadm_id = b.hadm_id AND bp.buffer_days = b.buffer_days
+LEFT JOIN el ON el.hadm_id = b.hadm_id AND el.buffer_days = b.buffer_days
+LEFT JOIN bm ON bm.hadm_id = b.hadm_id AND bm.buffer_days = b.buffer_days
+LEFT JOIN w  ON w.hadm_id  = b.hadm_id AND w.buffer_days  = b.buffer_days
+LEFT JOIN h  ON h.hadm_id  = b.hadm_id AND h.buffer_days  = b.buffer_days
+LEFT JOIN pc ON pc.hadm_id = b.hadm_id AND pc.buffer_days = b.buffer_days;
 
 -- ----------------------------------------------------------------------------
 -- 4. Outpatient laboratory values (labevents without hadm_id) of the current pregnancy
@@ -212,25 +227,55 @@ JOIN   tmp_ap_labraw r
 
 DROP TABLE IF EXISTS tmp_ap_lab_last;
 CREATE TEMP TABLE tmp_ap_lab_last AS
+WITH hb AS (
+    SELECT DISTINCT ON (hadm_id, buffer_days) hadm_id, buffer_days, valuenum
+    FROM   tmp_ap_lab
+    WHERE  is_hemoglobin AND valuenum BETWEEN 3 AND 20
+    ORDER  BY hadm_id, buffer_days, charttime DESC
+),
+anylab AS (
+    SELECT DISTINCT hadm_id, buffer_days FROM tmp_ap_lab
+)
 SELECT b.hadm_id, b.buffer_days,
        hb.valuenum                                                      AS last_hemoglobin,
-       EXISTS (SELECT 1 FROM tmp_ap_lab x
-               WHERE x.hadm_id = b.hadm_id AND x.buffer_days = b.buffer_days) AS any_pregnancy_lab
+       (al.hadm_id IS NOT NULL)                                         AS any_pregnancy_lab
 FROM   (SELECT DISTINCT hadm_id, buffer_days FROM tmp_ap_base) b
-LEFT JOIN LATERAL (SELECT x.valuenum FROM tmp_ap_lab x
-                   WHERE x.hadm_id = b.hadm_id AND x.buffer_days = b.buffer_days
-                     AND x.is_hemoglobin AND x.valuenum BETWEEN 3 AND 20
-                   ORDER BY x.charttime DESC LIMIT 1) hb ON TRUE;
+LEFT JOIN hb        ON hb.hadm_id = b.hadm_id AND hb.buffer_days = b.buffer_days
+LEFT JOIN anylab al ON al.hadm_id = b.hadm_id AND al.buffer_days = b.buffer_days;
 
 -- Any earlier information at all (any time before the window end), for the sensitivity analysis
 DROP TABLE IF EXISTS tmp_ap_anyinfo;
 CREATE TEMP TABLE tmp_ap_anyinfo AS
+WITH pa AS (
+    SELECT DISTINCT hadm_id, buffer_days FROM tmp_ap_prior
+),
+po AS (
+    SELECT DISTINCT hadm_id, buffer_days FROM tmp_ap_omr
+),
+fl AS (
+    SELECT subject_id, MIN(charttime) AS first_lab_time FROM tmp_ap_labraw GROUP BY subject_id
+)
 SELECT b.hadm_id, b.buffer_days,
-       (EXISTS (SELECT 1 FROM tmp_ap_prior p WHERE p.hadm_id = b.hadm_id AND p.buffer_days = b.buffer_days)
-     OR EXISTS (SELECT 1 FROM tmp_ap_omr o   WHERE o.hadm_id = b.hadm_id AND o.buffer_days = b.buffer_days)
-     OR EXISTS (SELECT 1 FROM tmp_ap_labraw r
-                WHERE r.subject_id = b.subject_id AND r.charttime <= b.t_info_end)) AS has_any_prior_information
-FROM   tmp_ap_base b;
+       (pa.hadm_id IS NOT NULL
+     OR po.hadm_id IS NOT NULL
+     OR COALESCE(fl.first_lab_time <= b.t_info_end, FALSE))             AS has_any_prior_information
+FROM   tmp_ap_base b
+LEFT JOIN pa ON pa.hadm_id = b.hadm_id AND pa.buffer_days = b.buffer_days
+LEFT JOIN po ON po.hadm_id = b.hadm_id AND po.buffer_days = b.buffer_days
+LEFT JOIN fl ON fl.subject_id = b.subject_id;
+
+-- Indexes and statistics of the temporary tables before the final join.
+-- Temporary tables are never analyzed automatically; without statistics the planner
+-- can choose nested-loop joins without an index and the final query takes hours.
+CREATE INDEX ON tmp_ap_hist     (hadm_id, buffer_days);
+CREATE INDEX ON tmp_ap_omr_last (hadm_id, buffer_days);
+CREATE INDEX ON tmp_ap_lab_last (hadm_id, buffer_days);
+CREATE INDEX ON tmp_ap_anyinfo  (hadm_id, buffer_days);
+ANALYZE tmp_ap_base;
+ANALYZE tmp_ap_hist;
+ANALYZE tmp_ap_omr_last;
+ANALYZE tmp_ap_lab_last;
+ANALYZE tmp_ap_anyinfo;
 
 -- ----------------------------------------------------------------------------
 -- 5. Predictor table (contract table of the antenatal model)

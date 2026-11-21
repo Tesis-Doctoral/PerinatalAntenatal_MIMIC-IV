@@ -1,8 +1,10 @@
 # Predicción prenatal de la muerte fetal en MIMIC-IV
 
+> **Framework.** Este repositorio aplica el framework por etapas para modelos de predicción clínica de la tesis. El framework (etapas, puertas, criterios y literatura) y el catálogo de modelos con su estado están en [StagedFramework_ClinicalPrediction](https://github.com/khem777/StagedFramework_ClinicalPrediction).
+
 ¿Se puede ver un riesgo alto de muerte fetal **antes** del ingreso para el parto, usando solo lo que se sabía de la mujer antes? Cuando la mujer llega al hospital, la muerte fetal muchas veces ya ocurrió; por eso este modelo usa solo información anterior al ingreso, de modo que el evento ocurre después de la información que lo predice. Sigue el framework por etapas para modelos de predicción clínica.
 
-> **Estado (18/11/2026): auditoría de conteos hecha.** Ficha del desenlace escrita; se ejecutó la auditoría de la información disponible antes del ingreso (tarea A1). Siguiente: tabla de predictores.
+> **Estado (19/11/2026): tabla de predictores hecha y verificada** ([`predictor_table_es.md`](predictor_table_es.md)). Puerta de tamaño de muestra (P3) **no pasada**: R² de Cox-Snell con validación cruzada de −0,00054 (mínimo para 27 parámetros: 0,0124; para 17: 0,0078). El modelo prenatal queda como análisis de factibilidad ([`data/outputs_01_sample_size_gate.txt`](data/outputs_01_sample_size_gate.txt)).
 
 [English version](README.md)
 
@@ -25,6 +27,7 @@ Una base local de PostgreSQL con MIMIC-IV v3.1 (módulo hosp). Todas las tablas 
 | 2 | `sql/00_cohort_and_label/02_fetal_death_label_es.sql` | `antenatal_fetal_death_codes`, `antenatal_fetal_death_label` (etiqueta por admisión) | E3, P1 |
 | 3 | `sql/01_audit_counts/01_prior_information_es.sql` | Nada (solo lectura): auditoría de conteos | E4 |
 | 4 | `sql/02_predictors/01_predictor_table_es.sql` | `antenatal_predictors_v1` (tabla de predictores, la que leen los modelos) | E6, E7 |
+| 5 | `notebooks/01_sample_size_gate_es.ipynb` | `data/outputs_01_sample_size_gate.txt` (puerta de tamaño de muestra) | P3 |
 
 Conteos de referencia que deben reproducirse: 25.736 admisiones obstétricas; 19.440 admisiones en la población del modelo, de 13.735 pacientes; 129 eventos estrictos y 142 con códigos parciales.
 

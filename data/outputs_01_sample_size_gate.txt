@@ -1,0 +1,5 @@
+Gate G3 (sample size), antenatal model; aggregate output only
+buffer_days=7; folds=5 grouped by patient; seed=20261119
+admissions=19440; events=129; prevalence=0.0066; candidate_parameters=27
+R2_cs_max=0.0767; R2_cs_observed_cv=-0.00054 (-0.7% of max)
+gate=NOT PASSED (cross-validated R2 is not positive)

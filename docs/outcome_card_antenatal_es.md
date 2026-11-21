@@ -54,6 +54,7 @@ Fijados el 18/11/2026 con las frecuencias de la auditoría de conteos (toda la p
 | Parámetros candidatos | 27 |
 | Parámetros soportados | Entre 17 y 25 según los criterios de Riley et al. con 19.440 admisiones y 129 eventos, si el R² de Cox-Snell es el 10% o el 15% de su máximo; la puerta usa el R² observado |
 | Modelo principal | Regresión logística penalizada (menos de 20 eventos por parámetro); modelos de árboles y ensamble como comparaciones |
+| Valores faltantes | Imputación múltiple por ecuaciones encadenadas, ajustada solo con los datos de entrenamiento de cada partición de la validación y aplicada a su prueba. El indicador "tuvo control prenatal en este hospital" es el único indicador de faltantes; no se agregan parámetros (27). Faltan presión en el 38,7%, hemoglobina en el 41,2% e IMC en el 57,3% ([`../predictor_table_es.md`](../predictor_table_es.md)). Decidido el 19/11/2026, antes de cualquier modelo; pendiente de validación por el director |
 | Conjunto reducido (17 parámetros) | Edad; raza y etnia (4); Medicaid; inglés; casada; tuvo control prenatal en este hospital; última sistólica; presión elevada; índice de masa corporal; hemoglobina; antecedente hipertensivo (crónico o en embarazo anterior); diabetes (pregestacional o gestacional en embarazo anterior); resultado adverso en embarazo anterior. Fijado antes de cualquier modelo; nunca elegido por asociación con el desenlace |
 
 ## 5b. Análisis de sensibilidad
@@ -83,8 +84,8 @@ Tablas de MIMIC-IV `admissions`, `patients`, `diagnoses_icd`, `procedures_icd`, 
 ## 8. Próximas tareas
 
 1. ~~Auditoría de conteos A1~~ (hecha, [`../count_audit_es.md`](../count_audit_es.md)).
-2. Tabla de predictores: `sql/02_predictors/01_predictor_table_es.sql` (tarea A2), una fila por admisión y margen.
-3. Verificación del tamaño de muestra con el R² de Cox-Snell observado (P3); conjunto reducido si hace falta.
+2. ~~Tabla de predictores A2~~ (hecha el 19/11/2026, [`../predictor_table_es.md`](../predictor_table_es.md)). Faltantes: imputación múltiple (sección 5).
+3. ~~Puerta de tamaño de muestra P3~~ (20/11/2026): **no pasada**. R² de Cox-Snell observado con validación cruzada: −0,00054 (−0,7% del máximo); el conjunto reducido de 17 tampoco alcanzaría (mínimo 0,0124 para 27 parámetros y 0,0078 para 17). El desenlace se reporta como análisis de factibilidad.
 4. Validación anidada agrupada, criterios C1, C2 y C4, clasificación.
 
 *Confidencial: uso interno del proyecto de investigación.*

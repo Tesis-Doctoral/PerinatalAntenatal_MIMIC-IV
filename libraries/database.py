@@ -10,12 +10,20 @@ is ever committed.
 import os
 import sqlalchemy as alchemy
 
-# Optional: load variables from a local .env file if python-dotenv is installed.
+from pathlib import Path
+
+# Load the variables of the .env file at the project root (one level above libraries/),
+# whatever the folder the notebook or script runs from.
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv(ENV_FILE, override=True)
 except ImportError:
-    pass
+    if ENV_FILE.exists():
+        raise ImportError(
+            "python-dotenv is not installed, so the .env file cannot be read. "
+            "Install it in the notebook kernel with: %pip install python-dotenv"
+        )
 
 
 def get_connect_database():
@@ -33,9 +41,8 @@ def get_connect_database():
 
     if not password:
         raise RuntimeError(
-            "MIMICIV_DB_PASSWORD is not set. Copy .env.example to .env, fill in your "
-            "own local Postgres password, and make sure python-dotenv is installed "
-            "(see requirements.txt)."
+            f"MIMICIV_DB_PASSWORD is not set. Expected file: {ENV_FILE}. Copy .env.example "
+            "to .env at the project root and fill in your own local Postgres password."
         )
 
     return alchemy.create_engine(f"{driver}://{user}:{password}@{host}:{port}/{database}")
